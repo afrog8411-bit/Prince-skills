@@ -1,98 +1,53 @@
 # glm-vision
 
-智谱 AI 免费多模态模型的 Claude Code Skill — **看图理解、AI 绘图、AI 视频**，零依赖。
+**给 Claude 装上一双眼睛。**
+
+发张图就能聊。截图、照片、图表、UI 设计图、手写笔记——扔过去，Claude 看得懂。还能画图、做视频。
+
+> 智谱 AI 免费多模态模型的 Claude Code Skill，零依赖。
 
 ## 能力
 
-| 能力 | 模型 | 说明 |
-|------|------|------|
-| 图片理解 | `glm-4v-flash` | 快速看图，128K 上下文 |
-| 图片分析 | `glm-4.1v-thinking-flash` | 思维链推理，适合图表/逻辑分析 |
-| AI 绘图 | `cogview-3-flash` | 文生图 |
-| AI 视频 | `cogvideox-flash` | 文生视频 / 图生视频 |
+| 能力 | 说人话 | 模型 |
+|------|--------|------|
+| 图片理解 | 发张图问"这是什么"、"里面写了什么"、"帮我分析这个图表" | `glm-4v-flash` |
+| 图片分析 | 图表数据解读、逻辑推理、UI 评审 | `glm-4.1v-thinking-flash` |
+| AI 绘图 | "画一只赛博朋克猫" | `cogview-3-flash` |
+| AI 视频 | "让这只猫动起来" | `cogvideox-flash` |
 
 ## 安装
 
 ### 前置条件
 
-1. 访问 [bigmodel.cn](https://bigmodel.cn) 注册并实名认证
-2. 进入控制台 → API Key → 创建新 Key
-3. 将 Key 写入环境变量或配置文件：
+1. 去 [bigmodel.cn](https://bigmodel.cn) 注册并实名认证（免费额度够用）
+2. 控制台 → API Key → 创建新 Key
+3. 把 Key 填到 `.env` 里：
 
 ```bash
-# 方式一：环境变量
-export ZHIPU_API_KEY=你的key
-
-# 方式二：配置文件
-cp .env.example .env
-# 编辑 .env 填入你的 Key
+GLM_API_KEY=你的key
 ```
 
-### 作为 Claude Code Skill 安装
+### 安装 skill
 
 ```bash
-cp -r glm-vision ~/.claude/skills/glm-vision
+/claude install https://github.com/afrog8411-bit/Prince-skills/tree/main/glm-vision
 ```
 
-安装后 Claude 会自动识别视觉相关请求并调用本工具。
-
-### 作为独立 CLI 使用
+### 安装 Python 依赖
 
 ```bash
-python scripts/glm.py --help
+pip install zhipuai pillow
 ```
 
-## 使用
+## 用法
 
-### 图片理解
+安装后在 Claude Code 里说：
 
-```bash
-python scripts/glm.py vision 截图.png
-python scripts/glm.py vision 截图.png -q "分析这个 UI 设计"
-python scripts/glm.py vision a.png b.png -q "对比这两张图" --thinking
-python scripts/glm.py vision https://example.com/pic.jpg
-```
+- "帮我看看这张图" + 图片路径
+- "这张图表讲了什么"
+- "画一张..."
+- "把这张图做成视频"
 
-### 交互式视觉对话
-
-```bash
-python scripts/glm.py chat 截图.png
-# 进入对话模式后可以来回追问
-```
-
-### AI 绘图
-
-```bash
-python scripts/glm.py draw "一只橘猫坐在窗台上" --enhance
-python scripts/glm.py draw "竖版海报" --size 720x1280
-```
-
-### AI 视频
-
-```bash
-# 一站式（推荐）
-python scripts/glm.py video "猫在草地上追蝴蝶"
-python scripts/glm.py video "猫追蝴蝶" --image 参考图.png
-
-# 分步
-python scripts/glm.py video-submit "描述"
-python scripts/glm.py video-poll <task_id>
-python scripts/glm.py video-download <url>
-```
-
-## 行为特性
-
-- **图片生成** — 完成后自动用默认查看器打开
-- **视频生成** — 一站式命令：自动重试提交 → 进度条 → 轮询 → 完成后定位到文件夹
-- **零外部依赖** — 纯 Python 标准库，无需 pip install
-- **自动重试** — API 限流时指数退避重试
-
-## 技术栈
-
-- Python 3.9+（标准库 only）
-- 智谱 AI OpenAPI（v4）
-- Claude Code Skill 框架
-
-## 开源协议
+## License
 
 MIT
