@@ -1,39 +1,47 @@
 # glm-vision
 
-**给 Claude 装上一双眼睛。**
+**DeepSeek 没有眼睛，智谱免费借你一双。**
 
-发张图就能聊。截图、照片、图表、UI 设计图、手写笔记——扔过去，Claude 看得懂。还能画图、做视频。
+DeepSeek V4 再强也只是纯文本。要「看图」？"帮我分析这张图表"？"给这段文案配张图"？"把这个做成视频"？——DeepSeek 做不到。
 
-> 智谱 AI 免费多模态模型的 Claude Code Skill，零依赖。
+智谱 AI 的免费多模态 API 刚好补上这块。而且不用额外付费。
 
-## 能力
+> Claude Code Skill，零依赖。
 
-| 能力 | 说人话 | 模型 |
-|------|--------|------|
-| 图片理解 | 发张图问"这是什么"、"里面写了什么"、"帮我分析这个图表" | `glm-4v-flash` |
-| 图片分析 | 图表数据解读、逻辑推理、UI 评审 | `glm-4.1v-thinking-flash` |
-| AI 绘图 | "画一只赛博朋克猫" | `cogview-3-flash` |
-| AI 视频 | "让这只猫动起来" | `cogvideox-flash` |
+## 白嫖什么
+
+| 能力 | 说明 | 免费 |
+|------|------|------|
+| 图片理解 | 发截图、图表、UI、手写笔记，让 AI 看 | 免费额度够用 |
+| 图片分析 | 图表数据解读、逻辑推理、UI 评审（思维链） | 免费 |
+| AI 绘图 | "赛博朋克猫""极简风海报"，文生图 | 免费 |
+| AI 视频 | 图生视频、文生视频 | 免费 |
+
+## 和 DeepSeek 什么关系
+
+没有任何关系。纯互补。
+
+你用 DeepSeek 写代码、推理、长文——它擅长的事交给它。遇到图片、视觉生成类的需求，这个 skill 帮你一键调智谱的免费 API。同一个 Claude 会话里无缝切换。
 
 ## 安装
 
-### 前置条件
+### 1. 注册智谱
 
-1. 去 [bigmodel.cn](https://bigmodel.cn) 注册并实名认证（免费额度够用）
-2. 控制台 → API Key → 创建新 Key
-3. 把 Key 填到 `.env` 里：
+去 [bigmodel.cn](https://bigmodel.cn) → 注册 → 实名认证 → 控制台创建 API Key（免费额度日常够用）
+
+### 2. 配置 Key
 
 ```bash
 GLM_API_KEY=你的key
 ```
 
-### 安装 skill
+### 3. 安装 skill
 
 ```bash
 /claude install https://github.com/afrog8411-bit/Prince-skills/tree/main/glm-vision
 ```
 
-### 安装 Python 依赖
+### 4. 装 Python 依赖
 
 ```bash
 pip install zhipuai pillow
@@ -41,11 +49,12 @@ pip install zhipuai pillow
 
 ## 用法
 
-安装后在 Claude Code 里说：
+在 Claude Code 里直接说：
 
-- "帮我看看这张图" + 图片路径
-- "这张图表讲了什么"
-- "画一张..."
+- "帮我看看这张图 /path/to/image.png"
+- "这个 UI 设计怎么样"
+- "这张图表的数据趋势是什么"
+- "帮我画一张..."
 - "把这张图做成视频"
 
 ## License
