@@ -49,8 +49,10 @@ description: |
 | `Alt+S` | 打开 Claude Code | 在当前目录启动 Claude（默认 `C:\free`） |
 | `Alt+C` | 单击：最小化/恢复当前 Claude 窗口 | 有窗口时收回，无窗口时恢复 |
 | | 长按：轮转切换多个 Claude 窗口 | 按住超过 300ms 进入轮转模式 |
-| `Ctrl+Alt+C` | 将选中文本发送到 Claude 窗口 | 复制 → 激活 Claude → 粘贴发送 |
 | `Alt+V` | 截图秒发 | 剪贴板有图时自动存图并打出路径，你手动回车发送给 Claude |
+
+可选附加：
+- 「发送选中文本」功能（默认不开启）：选中文本后按快捷键自动发送到 Claude 窗口。如需要可在自定义设置中开启并分配快捷键，建议用 `Ctrl+Shift+C` 等不易误触的组合。
 
 配套文件：
 - `install-ahk.ps1` — AHK v2 安装检测脚本，未安装时自动下载安装
@@ -84,56 +86,91 @@ description: |
 
 #### Step 1：项目目录
 
-```
-你可以设置快捷键，一键在指定目录打开 Claude Code。
-比如 Alt+1 在 D:\projects\blog 打开，Alt+2 在另一个目录打开。
+用 AskUserQuestion 询问（单选）：
 
-你有要添加的目录吗？直接告诉我路径和想要的快捷键。
-如果没有，默认只有一个 Alt+S 启动。
+```json
+{
+  "question": "设置快捷键一键在指定目录打开 Claude Code。比如 Alt+S 在 C:\free 启动，Alt+1 在 D:\projects\blog 启动。",
+  "header": "项目目录",
+  "options": [
+    {"label": "默认单目录", "description": "Alt+S 在 C:\free 启动 Claude Code（推荐）"},
+    {"label": "自定义目录", "description": "自己指定路径和快捷键"},
+    {"label": "多目录", "description": "添加多个目录，分配 Alt+1、Alt+2…"},
+    {"label": "跳过", "description": "不需要启动快捷键"}
+  ],
+  "multiSelect": false
+}
 ```
 
-用户在对话中给出目录列表。如果只给了目录没指定快捷键，由 skill 自动分配 Alt+1、Alt+2… 依此类推。
+各选项后续处理：
+- 选"默认单目录"→ 检测 `C:\free` 是否存在。不存在时让用户输入路径。
+- 选"自定义目录"→ 让用户输入路径，可选指定快捷键（未指定则用 Alt+S）。
+- 选"多目录"→ 让用户逐一输入目录列表。如果只给了目录没指定快捷键，自动分配 Alt+1、Alt+2…。
+- 选"跳过"→ 不留启动快捷键。
 
 #### Step 2：窗口管理
 
+用 AskUserQuestion 询问（单选）：
+
+```json
+{
+  "question": "是否需要窗口管理功能？单击 Alt+C 最小化/恢复 Claude 窗口，长按超过 300ms 轮转切换多个 Claude 窗口。",
+  "header": "窗口管理",
+  "options": [
+    {"label": "开启，默认 Alt+C", "description": "单击收起/恢复，长按轮转切换（推荐）"},
+    {"label": "开启，自定义快捷键", "description": "自己指定快捷键"},
+    {"label": "跳过", "description": "不需要此功能"}
+  ],
+  "multiSelect": false
+}
 ```
-是否需要窗口管理功能？
-（单击最小化/恢复，长按轮转切换多个 Claude 窗口）
 
-  默认快捷键：Alt+C
-  也可以改成其他键，或跳过
+- 选"自定义快捷键"→ 再用 AskUserQuestion 问用户要什么组合键，建议避开 Alt+S 和 Alt+V
+- 选"跳过"→ 不留窗口管理快捷键
 
-  你的选择是？
+#### Step 3：发送选中文本（可选，默认不开启）
+
+用 AskUserQuestion 询问（单选）：
+
+```json
+{
+  "question": "是否需要「发送选中文本给 Claude」功能？选中文字后按快捷键自动复制并发送到 Claude 窗口。",
+  "header": "发送文本",
+  "options": [
+    {"label": "开启，默认快捷键", "description": "用 Ctrl+Shift+C（推荐，不易与其他软件冲突）"},
+    {"label": "开启，自定义快捷键", "description": "自己指定快捷键"},
+    {"label": "不需要", "description": "跳过此功能（默认）"}
+  ],
+  "multiSelect": false
+}
 ```
 
-#### Step 3：发送选中文本
-
-```
-是否需要"发送选中文本给 Claude"功能？
-（选中任意文本，按快捷键自动发送到 Claude 窗口）
-
-  默认快捷键：Ctrl+Alt+C
-  也可以改成其他键，或跳过
-
-  你的选择是？
-```
+- 选"不需要"→ 跳过
+- 选"自定义快捷键"→ 再用 AskUserQuestion 问用户要什么组合键
 
 #### Step 4：终端选择
 
-```
-你使用哪个终端运行 Claude？
+用 AskUserQuestion 询问（单选）：
 
-  1) Windows Terminal（默认）
-  2) PowerShell 7
-  3) 命令提示符 (cmd)
-  4) Alacritty
-  5) WezTerm
-  6) Git Bash
-  7) ConEmu / Cmder
-  8) 其他（请说明）
-
-  你的选择是？
+```json
+{
+  "question": "你使用哪个终端运行 Claude？",
+  "header": "终端选择",
+  "options": [
+    {"label": "Windows Terminal", "description": "默认"},
+    {"label": "PowerShell 7", "description": "pwsh.exe"},
+    {"label": "命令提示符", "description": "cmd.exe"},
+    {"label": "Alacritty", "description": "alacritty.exe"},
+    {"label": "WezTerm", "description": "wezterm-gui.exe"},
+    {"label": "Git Bash", "description": "mintty.exe / Git for Windows"},
+    {"label": "ConEmu / Cmder", "description": "ConEmu64.exe"},
+    {"label": "其他", "description": "用户自行说明"}
+  ],
+  "multiSelect": false
+}
 ```
+
+按终端映射表（见下文）填写对应的 `ahk_exe` 和启动命令。选"其他"时让用户补充终端 exe 名称。
 
 #### Step 5：截图秒发
 
@@ -149,19 +186,23 @@ description: |
 注意：路径打出来后你可以加描述再回车，也可以直接回车。
 ```
 
-	```
-	是否需要"截图秒发"功能？
-	开启后按 Alt+V 自动存图并打出路径，你手动回车发送。
+用 AskUserQuestion 询问（单选）：
 
-	 💡 搭配推荐：如果你也安装了 see-free（视觉识别 skill），
-	    截图发给 Claude 后它可以直接调用视觉模型看图。
-	    一套快捷键打通"截图→发给 AI→AI 看懂"。
+```json
+{
+  "question": "是否需要「截图秒发」功能？开启后按 Alt+V 自动存图并打出路径，手动回车发送给 Claude。\n\n说明：终端不接受图片粘贴。不管什么截图工具——截完图图片在剪贴板，切到 Claude 终端按 Ctrl+V 没反应。Alt+V 自动存图→打出路径→你回车发送。\n\n搭配推荐：如果你也安装了 see-free（视觉识别 skill），截图发给 Claude 后可调用视觉模型看图。一套快捷键打通「截图→发给 AI→AI 看懂」。",
+  "header": "截图秒发",
+  "options": [
+    {"label": "开启，默认 Alt+V", "description": "不与任何常用快捷键冲突（推荐）"},
+    {"label": "开启，自定义快捷键", "description": "自己指定快捷键"},
+    {"label": "跳过", "description": "不需要此功能"}
+  ],
+  "multiSelect": false
+}
+```
 
-	  默认开启（Alt+V，不与任何快捷键冲突）
-	  也可以改成其他键，或跳过
-
-	  你的选择是？
-	```
+- 选"自定义快捷键"→ 再用 AskUserQuestion 问用户要什么组合键
+- 选"跳过"→ 不留截图秒发功能
 
 ### 路径 C：直接说需求
 
@@ -184,7 +225,6 @@ description: |
 快捷键方案：
   Alt+S  → C:\free 启动 Claude Code
   Alt+C  → 窗口管理（单击收起 / 长按轮转）
-  Ctrl+Alt+C → 选中文本发送给 Claude
   Alt+V  → 截图秒发（存图 + 打出路径，手动回车发送）
 
 终端：Windows Terminal

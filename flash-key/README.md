@@ -75,7 +75,7 @@ Ever felt annoyed switching windows while using Claude Code on Windows? This ski
 | `Alt+S` | 在当前目录打开 Claude Code / Launch Claude Code |
 | `Alt+C` (单击/click) | 最小化/恢复 Claude 窗口 / Minimize/restore window |
 | `Alt+C` (长按/hold) | 轮转切换多个 Claude 窗口 / Cycle through windows |
-| `Ctrl+Alt+C` | 选中文本发送给 Claude / Send selected text to Claude |
+| `Alt+V` | 截图秒发：存图并打出路径，手动回车发送 / Save screenshot and print path |
 
 ### 生成的配套文件 / Generated Files
 
