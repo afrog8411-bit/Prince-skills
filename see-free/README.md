@@ -1,4 +1,4 @@
-# glm-vision
+# see-free
 
 **DeepSeek 没有眼睛，智谱免费借你一双。**
 
@@ -38,7 +38,7 @@ GLM_API_KEY=你的key
 ### 3. 安装 skill
 
 ```bash
-/claude install https://github.com/afrog8411-bit/Prince-skills/tree/main/glm-vision
+/claude install https://github.com/afrog8411-bit/Prince-skills/tree/main/see-free
 ```
 
 ### 4. 装 Python 依赖

@@ -1,4 +1,4 @@
-# glm-vision — 智谱 AI 视觉 Skill
+# see-free — 智谱 AI 视觉 Skill
 
 ## 项目说明
 

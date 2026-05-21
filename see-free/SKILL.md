@@ -1,5 +1,5 @@
 ---
-name: glm-vision
+name: see-free
 description: >
   智谱AI 免费多模态 — 看图理解、AI 绘图、AI 视频。
   以下场景触发：

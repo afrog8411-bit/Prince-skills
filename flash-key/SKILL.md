@@ -1,5 +1,5 @@
 ---
-name: claude-ahk
+name: flash-key
 description: |
   交互式设置向导，为 Claude Code 生成 Windows 键盘快捷键（AutoHotkey v2 脚本）。
   用户可以说"帮我配一套 Claude 快捷键"、"设置快捷键启动 Claude"、"AHK 配置向导"、
@@ -10,7 +10,7 @@ description: |
   不要用于非 Windows 快捷键配置或非 Claude Code 相关场景。
 ---
 
-# claude-ahk — Claude Code 快捷键设置向导
+# flash-key — Claude Code 快捷键设置向导
 
 为 Claude Code 生成 Windows 键盘快捷键（AutoHotkey v2 脚本）。
 

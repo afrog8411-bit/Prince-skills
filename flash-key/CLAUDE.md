@@ -1,4 +1,4 @@
-# C:\free\projects\claude-ahk — Claude Code 快捷键 Skill
+# flash-key — Claude Code 快捷键 Skill
 
 ## 项目说明
 - 为 Claude Code 生成 Windows 快捷键的交互式 Skill

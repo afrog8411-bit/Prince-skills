@@ -8,8 +8,8 @@
 
 | Skill | 一句话 |
 |-------|--------|
-| [claude-ahk](claude-ahk/) | Windows 下一键启动 Claude、管理窗口、发送选中文本。快捷键办事，不靠鼠标。 |
-| [glm-vision](glm-vision/) | DeepSeek 没有眼睛？智谱免费借一双。看图、画图、做视频，白嫖智谱免费多模态 API。 |
+| [flash-key](flash-key/) | 一闪启动 Claude，快捷键办事不靠鼠标。窗口管理、选中发送，清爽流畅。 |
+| [see-free](see-free/) | DeepSeek 没有眼睛？智谱免费借一双。看图、画图、做视频，视觉无限制。 |
 
 ## 安装方法
 

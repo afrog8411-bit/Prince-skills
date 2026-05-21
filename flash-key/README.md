@@ -1,4 +1,4 @@
-# claude-ahk
+# flash-key
 
 **快捷键办事，不靠鼠标。**
 
