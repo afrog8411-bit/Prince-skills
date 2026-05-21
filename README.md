@@ -7,6 +7,7 @@ My Claude Code skill collection.
 | Skill | Description |
 |-------|-------------|
 | [claude-ahk](claude-ahk/) | Claude Code Windows 快捷键设置向导（AutoHotkey v2） |
+| [glm-vision](glm-vision/) | 智谱AI 多模态视觉 Skill — 看图理解、AI 绘图、AI 视频 |
 
 ## Installation
 
