@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""智谱AI 免费模型 — 视觉 / 绘图 / 视频 / 对话  v3"""
+"""智谱AI 免费模型 — 视觉 / 绘图 / 视频 / 对话  v4 — 多 Key 智能调度 + 并行批处理"""
 
 import sys, os, base64, json, argparse, time, mimetypes, re, textwrap, subprocess
-import io
+import io, threading
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 BASE_URL = "https://open.bigmodel.cn/api/paas/v4"
 ENHANCE_SUFFIX = "，高质量，细节丰富，专业构图，精美"
@@ -14,42 +15,138 @@ RETRY_DELAYS = [1, 2, 4, 8]
 
 # ----- helpers -----
 def load_key():
-    for var in ["ZHIPU_API_KEY"]:
-        if os.environ.get(var):
-            return os.environ[var]
+    """返回主 API Key（向后兼容）。"""
+    return load_keys()[0]
+
+def load_keys():
+    """加载所有可用的 API Key（环境变量 + .env 文件），去重。"""
+    keys = []
+    # 环境变量：ZHIPU_API_KEY, ZHIPU_API_KEY_2, ...
+    for i in range(10):
+        var = "ZHIPU_API_KEY" if i == 0 else f"ZHIPU_API_KEY_{i}"
+        val = os.environ.get(var)
+        if val:
+            val = val.strip().strip('"').strip("'")
+            if val and val not in keys:
+                keys.append(val)
+    # .env 文件
     env_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env")
     if os.path.exists(env_file):
-        with open(env_file) as f:
+        with open(env_file, encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
-                if line.startswith("ZHIPU_API_KEY="):
-                    return line.split("=", 1)[1].strip().strip('"').strip("'")
-    return ""
+                if "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                k = k.strip()
+                v = v.strip().strip('"').strip("'")
+                if k.startswith("ZHIPU_API_KEY") and v and v not in keys:
+                    keys.append(v)
+    return keys if keys else [""]
+
+# ----- 智能 Key 调度器 -----
+_SCHED_STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".key_state.json")
+
+class KeyScheduler:
+    """多 Key 智能调度：跨进程持久化健康追踪 + round-robin 公平分发。"""
+    def __init__(self):
+        self.keys = load_keys()
+        self._lock = threading.Lock()
+        self._state = self._load_state()
+        self._health = self._state.get("health", {})
+        self._rr = self._state.get("rr", 0)
+        for k in self.keys:
+            if k not in self._health:
+                self._health[k] = {"ok": 0, "err": 0, "last_429": 0.0}
+
+    def _load_state(self):
+        try:
+            with open(_SCHED_STATE_FILE, encoding="utf-8") as f:
+                return json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return {}
+
+    def _save_state(self):
+        try:
+            os.makedirs(os.path.dirname(_SCHED_STATE_FILE), exist_ok=True)
+            with open(_SCHED_STATE_FILE, "w", encoding="utf-8") as f:
+                json.dump({"rr": self._rr, "health": self._health}, f, ensure_ascii=False, indent=2)
+        except OSError:
+            pass
+
+    def pick(self):
+        """Round-robin 选择，优先健康 key，冷却 key 自动降权。"""
+        with self._lock:
+            now = time.time()
+            healthy = [k for k in self.keys if now - self._health[k]["last_429"] > 30]
+            cooling = [k for k in self.keys if now - self._health[k]["last_429"] <= 30]
+            pool = healthy if healthy else sorted(cooling, key=lambda k: -self._health[k]["last_429"])
+            key = pool[self._rr % len(pool)]
+            self._rr = (self._rr + 1) % max(len(pool), 1)
+            self._save_state()
+            return key
+
+    def ok(self, key):
+        with self._lock:
+            self._health[key]["ok"] += 1
+            self._save_state()
+
+    def fail(self, key):
+        with self._lock:
+            self._health[key]["err"] += 1
+            self._health[key]["last_429"] = time.time()
+            self._save_state()
+
+    def best_worker_count(self):
+        """根据健康状态推荐并行数。"""
+        with self._lock:
+            now = time.time()
+            healthy = sum(1 for k in self.keys if now - self._health[k]["last_429"] > 30)
+            return max(1, min(healthy, len(self.keys)))
+
+    def status(self):
+        """返回各 key 状态摘要。"""
+        with self._lock:
+            lines = []
+            for i, k in enumerate(self.keys):
+                h = self._health[k]
+                cd = max(0, 30 - (time.time() - h["last_429"]))
+                tag = "❄️冷却" if cd > 0 else "✅正常"
+                lines.append(f"  key{i+1}: {h['ok']}ok/{h['err']}err {tag} ({cd:.0f}s)")
+            return "\n".join(lines)
+
+_scheduler = None
+def get_scheduler():
+    global _scheduler
+    if _scheduler is None:
+        _scheduler = KeyScheduler()
+    return _scheduler
+
 
 def _req(endpoint, data=None, method="POST"):
     if data is None:
         data = {}
-    key = load_key()
-    if not key:
+    keys = load_keys()
+    if not keys or not keys[0]:
         print("请先设置 ZHIPU_API_KEY", file=sys.stderr)
-        print("注册 bigmodel.cn → API Key → 写入 ~/skills/glm-vision/.env", file=sys.stderr)
+        print("注册 bigmodel.cn → API Key → 写入 .env", file=sys.stderr)
         sys.exit(1)
     url = f"{BASE_URL}{endpoint}"
-    headers = {"Authorization": f"Bearer {key}"}
-    body = None
-    if method != "GET":
-        headers["Content-Type"] = "application/json"
-        body = json.dumps(data).encode("utf-8")
+    body = json.dumps(data).encode("utf-8") if method != "GET" else None
+    sched = get_scheduler()
 
+    total = RETRY_MAX * len(keys)
     last_err = None
-    for attempt in range(RETRY_MAX):
+    for attempt in range(total):
+        key = sched.pick()
+        headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
         try:
             with urlopen(Request(url, data=body, headers=headers, method=method), timeout=120) as r:
+                sched.ok(key)
                 return json.loads(r.read().decode("utf-8"))
         except HTTPError as e:
             code = e.code
             err_body = e.read().decode()
-            # 内容审核拦截
             try:
                 err_data = json.loads(err_body)
                 err_code = err_data.get("error", {}).get("code", "")
@@ -58,19 +155,19 @@ def _req(endpoint, data=None, method="POST"):
                     sys.exit(1)
             except json.JSONDecodeError:
                 pass
-            # 429 / 5xx → 重试
-            if code in (429, 500, 502, 503) and attempt < RETRY_MAX - 1:
-                wait = RETRY_DELAYS[attempt]
-                print(f"  [API {code}] 重试 {attempt+1}/{RETRY_MAX} ({wait}s)...", file=sys.stderr)
+            if code in (429, 500, 502, 503) and attempt < total - 1:
+                sched.fail(key)
+                wait = RETRY_DELAYS[attempt % len(RETRY_DELAYS)]
+                print(f"  [API {code}] 重试 {attempt+1}/{total} ({wait}s)...", file=sys.stderr)
                 time.sleep(wait)
                 last_err = err_body
                 continue
             print(f"API 错误 ({code}): {err_body[:200]}", file=sys.stderr)
             sys.exit(1)
         except URLError as e:
-            if attempt < RETRY_MAX - 1:
-                wait = RETRY_DELAYS[attempt]
-                print(f"  [连接失败] 重试 {attempt+1}/{RETRY_MAX} ({wait}s)...", file=sys.stderr)
+            if attempt < total - 1:
+                wait = RETRY_DELAYS[attempt % len(RETRY_DELAYS)]
+                print(f"  [连接失败] 重试 {attempt+1}/{total} ({wait}s)...", file=sys.stderr)
                 time.sleep(wait)
                 last_err = str(e)
                 continue
@@ -365,6 +462,69 @@ def do_video_download(url, output_path):
         print(f"下载失败 (HTTP {code}): {err}", file=sys.stderr)
         sys.exit(1)
 
+def do_keys_status():
+    """显示所有 key 的健康状态。"""
+    sched = get_scheduler()
+    print(f"共 {len(sched.keys)} 个 API Key，推荐并行数 {sched.best_worker_count()}：")
+    print(sched.status())
+
+def do_queue(prompt_file, workers=None, size="1024x1024", enhance=False):
+    """从文件逐行读取提示词，多 Key 并行生成图片。"""
+    with open(prompt_file, encoding="utf-8") as f:
+        prompts = [line.strip() for line in f if line.strip()]
+
+    if not prompts:
+        print("队列为空")
+        return
+
+    print(f"队列共 {len(prompts)} 条提示词")
+    do_batch_draw(prompts, size=size, enhance=enhance, workers=workers)
+
+def do_batch_draw(prompts, size="1024x1024", enhance=False, workers=None):
+    """并行生成多张图片——每个子进程独立调度，自动调节并行数。"""
+    script = os.path.abspath(__file__)
+    base = ["python", script, "draw"]
+    if enhance: base.append("--enhance")
+    if size != "1024x1024": base.extend(["--size", size])
+    if workers is None:
+        workers = get_scheduler().best_worker_count()
+
+    with ThreadPoolExecutor(max_workers=min(workers, len(prompts))) as ex:
+        futures = {ex.submit(subprocess.run, base + [p], capture_output=True, encoding="utf-8", errors="replace", timeout=180): p for p in prompts}
+        for f in as_completed(futures):
+            p = futures[f][:40]
+            r = f.result()
+            if r.returncode == 0:
+                out = (r.stdout or "").strip()
+                print(f"✅ {p[:40]} → {out}")
+            else:
+                err = (r.stderr or "").strip()[:120]
+                print(f"❌ {p[:40]} → {err}")
+
+def do_batch_vision(images, question=None, thinking=False, workers=None):
+    """并行图片理解——每个子进程独立调度，自动调节并行数。"""
+    script = os.path.abspath(__file__)
+    base = ["python", script, "vision"]
+    if question: base.extend(["-q", question])
+    if thinking: base.append("--thinking")
+    if workers is None:
+        workers = get_scheduler().best_worker_count()
+    workers = min(workers, len(images))
+    if workers < 1:
+        workers = 1
+
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        futures = {ex.submit(subprocess.run, base + [img], capture_output=True, timeout=180): img for img in images}
+        for f in as_completed(futures):
+            img = os.path.basename(futures[f])
+            r = f.result()
+            if r.returncode == 0:
+                ans = r.stdout.decode("utf-8", errors="replace").strip()[:150]
+                print(f"[OK] {img}: {ans}")
+            else:
+                err = r.stderr.decode("utf-8", errors="replace").strip()[:120]
+                print(f"[FAIL] {img}: {err}")
+
 # ----- cli -----
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description="智谱 AI 免费模型")
@@ -396,6 +556,26 @@ if __name__ == "__main__":
     v.add_argument("prompt")
     v.add_argument("--image", default=None, help="参考图片路径（图生视频）")
 
+    kp = sp.add_parser("keys", help="查看 API Key 健康状态")
+
+    qp = sp.add_parser("queue", help="从文件逐行读取提示词并行生成")
+    qp.add_argument("file", help="提示词文件（每行一个）")
+    qp.add_argument("--workers", type=int, default=None, help="并行数")
+    qp.add_argument("--size", default="1024x1024", choices=["1024x1024", "1280x720", "720x1280"])
+    qp.add_argument("--enhance", action="store_true")
+
+    bdp = sp.add_parser("batch-draw", help="并行生成多张图片")
+    bdp.add_argument("prompts", nargs="+")
+    bdp.add_argument("--size", default="1024x1024", choices=["1024x1024", "1280x720", "720x1280"])
+    bdp.add_argument("--enhance", action="store_true")
+    bdp.add_argument("--workers", type=int, default=None, help="并行数（默认 auto）")
+
+    bvp = sp.add_parser("batch-vision", help="并行图片理解")
+    bvp.add_argument("images", nargs="+")
+    bvp.add_argument("-q", "--question", default=None)
+    bvp.add_argument("--thinking", action="store_true")
+    bvp.add_argument("--workers", type=int, default=None, help="并行数（默认 auto）")
+
     args = p.parse_args()
     if args.cmd == "vision":
         do_vision(args.images, args.question, args.thinking)
@@ -411,5 +591,13 @@ if __name__ == "__main__":
         do_video_download(args.url, args.output_path)
     elif args.cmd == "video":
         do_video(args.prompt, args.image)
+    elif args.cmd == "keys":
+        do_keys_status()
+    elif args.cmd == "queue":
+        do_queue(args.file, args.workers, args.size, args.enhance)
+    elif args.cmd == "batch-draw":
+        do_batch_draw(args.prompts, args.size, args.enhance, args.workers)
+    elif args.cmd == "batch-vision":
+        do_batch_vision(args.images, args.question, args.thinking, args.workers)
     else:
         p.print_help()

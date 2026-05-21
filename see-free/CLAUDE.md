@@ -30,7 +30,20 @@ glm-vision/
 python scripts/glm.py vision <图片路径> -q "问题"
 python scripts/glm.py chat <图片路径>
 python scripts/glm.py draw "描述" --enhance
+
+# v4 多 Key / 批量命令
+python scripts/glm.py keys                   # 查看 Key 健康状态
+python scripts/glm.py batch-draw "p1" "p2"   # 并行生成多张图
+python scripts/glm.py batch-vision a.png b.png -q "描述"  # 并行看图
+python scripts/glm.py queue prompts.txt      # 从文件队列生成
 ```
+
+## 多 Key 配置（v4）
+
+- 支持多个智谱账号 Key 自动负载均衡
+- `.env` 中配置 `ZHIPU_API_KEY`、`ZHIPU_API_KEY_2`、`ZHIPU_API_KEY_3` ...
+- 遇到 429 自动换 Key，冷却 30s 后恢复
+- 健康状态跨进程持久化（`.key_state.json`，已 gitignore）
 
 ## 生成类任务规则
 
