@@ -18,7 +18,7 @@ description: |
 
 首次触发时通过 `uname -s` 或 `(Get-CimInstance Win32_OperatingSystem).Caption` 检测用户操作系统：
 
-- **Windows** → 正常走 AutoHotkey 生成流程
+- **Windows** → 正常走 AutoHotkey 生成流程。先简单说明：AutoHotkey（AHK）是一个 Windows 下的快捷键工具，这个 skill 会为你生成一套 AHK 脚本，安装后按快捷键就能操控 Claude Code。脚本安全、开源、不联网。
 - **macOS** → 提示不支持 AHK，推荐 [Hammerspoon](https://www.hammerspoon.org/)
 - **Linux** → 提示不支持 AHK，推荐 xdotool / xbindkeys
 
@@ -50,9 +50,11 @@ description: |
 | `Alt+C` | 单击：最小化/恢复当前 Claude 窗口 | 有窗口时收回，无窗口时恢复 |
 | | 长按：轮转切换多个 Claude 窗口 | 按住超过 300ms 进入轮转模式 |
 | `Ctrl+Alt+C` | 将选中文本发送到 Claude 窗口 | 复制 → 激活 Claude → 粘贴发送 |
+| `Alt+V` | 截图秒发 | 剪贴板有图时自动存图并打出路径，你手动回车发送给 Claude |
 
 配套文件：
 - `install-ahk.ps1` — AHK v2 安装检测脚本，未安装时自动下载安装
+- `save-clipimg.ps1` — 剪贴板图片保存助手
 
 ---
 
@@ -61,7 +63,7 @@ description: |
 入口是一个三选一的选择器：
 
 ```
-选项 A：就用默认配置  — 直接生成 Prince 的配置方案
+选项 A：就用默认配置  — 一键生成，即装即用
 选项 B：自定义设置     — 逐步引导，每步都问
 选项 C：直接说需求     — 跳过向导，用户自由描述
 ```
@@ -70,7 +72,11 @@ description: |
 
 ### 路径 A：就用默认配置
 
-用户选这个 → 直接跳到最终确认（展示汇总 → 确认 → 生成）。不再问任何多余问题。
+用户选这个 → 检测 `C:\free` 是否存在：
+- **存在** → 直接跳到最终确认。不再问任何多余问题。
+- **不存在** → 问一句："Alt+S 要在哪个目录打开 Claude？" 用户给一个路径即可，不问其他选项。
+
+然后展示汇总 → 确认 → 生成。
 
 ### 路径 B：自定义设置
 
@@ -129,6 +135,34 @@ description: |
   你的选择是？
 ```
 
+#### Step 5：截图秒发
+
+这个功能解决一个很常见但各家截图工具不一样的痛点。
+
+**问题**：终端不接受图片粘贴。不管你用微信 Alt+A、Win+Shift+S、Snipaste、还是 PrintScreen——截完图图片在剪贴板，但切到 Claude 终端按 Ctrl+V，没有反应。
+
+**解决**：Alt+V 把剪贴板图片自动存成文件并打出路径，你手动回车发给 Claude。不管你用什么截图工具，最后都是按同一个快捷键。
+
+```
+像这样：截图（任意工具）→ 切到 Claude → Alt+V → C:\free\screenshots\xxx.png → 回车
+
+注意：路径打出来后你可以加描述再回车，也可以直接回车。
+```
+
+	```
+	是否需要"截图秒发"功能？
+	开启后按 Alt+V 自动存图并打出路径，你手动回车发送。
+
+	 💡 搭配推荐：如果你也安装了 see-free（视觉识别 skill），
+	    截图发给 Claude 后它可以直接调用视觉模型看图。
+	    一套快捷键打通"截图→发给 AI→AI 看懂"。
+
+	  默认开启（Alt+V，不与任何快捷键冲突）
+	  也可以改成其他键，或跳过
+
+	  你的选择是？
+	```
+
 ### 路径 C：直接说需求
 
 跳过向导，直接根据用户描述生成。
@@ -137,7 +171,12 @@ description: |
 
 ## 最终确认（所有路径共用）
 
-无论走哪条路，生成前都要展示汇总让用户确认：
+无论走哪条路，生成前都要做两项预检：
+
+1. **claude 命令检查**：运行 `claude --version`（通过 PowerShell），如果失败，提示用户先安装 Claude Code CLI 或将其加入 PATH
+2. **生成目录检查**：确认目标目录是否存在，不存在则自动创建
+
+预检通过后，展示汇总让用户确认：
 
 ```
 ## 即将生成以下配置
@@ -146,9 +185,10 @@ description: |
   Alt+S  → C:\free 启动 Claude Code
   Alt+C  → 窗口管理（单击收起 / 长按轮转）
   Ctrl+Alt+C → 选中文本发送给 Claude
+  Alt+V  → 截图秒发（存图 + 打出路径，手动回车发送）
 
 终端：Windows Terminal
-配套：install-ahk.ps1（AHK v2 安装检测）
+配套：install-ahk.ps1（AHK v2 安装检测）+ save-clipimg.ps1（截图秒发助手）
 
 确认生成？(Y/n)
 ```
@@ -156,9 +196,22 @@ description: |
 用户确认后生成文件。文件默认保存到主快捷键对应的目录下：
 - 单目录场景（默认 Alt+S）：文件生成到该目录（如 `C:\free\claude_shortcuts.ahk`）
 - 多目录场景（Alt+1、Alt+2…）：文件生成到**第一个**目录下
-- 配套 `install-ahk.ps1` 与 AHK 文件放在同目录
+- 配套 `install-ahk.ps1`（AHK 安装检测）和 `save-clipimg.ps1`（截图粘贴助手）与 AHK 文件放在同目录
 
 ---
+
+## AHK 脚本组装说明
+
+生成时按以下顺序拼装各个代码片段：
+
+```
+1. 脚本头部（#Requires、#SingleInstance、托盘菜单）
+2. 全局变量定义（_targetExe、_screenshotsDir 等）
+3. 快捷键定义（Alt+S 启动、Alt+C 窗口管理、Ctrl+Alt+C 发送文本、Alt+V 截图秒发）
+4. 函数定义（_ClickAction、_CycleAction、_HoldCheck 等）
+```
+
+每个片段以 `; ── 功能名 ──` 注释分隔。生成的 `.ahk` 文件是完整可运行的，用户不需要手动拼接。
 
 ## AHK 代码模式
 
@@ -170,11 +223,16 @@ description: |
 
 ```autohotkey
 !s::{
-  if !DirExist("C:\path") {
-    MsgBox("目录不存在: C:\path")
+  target := "C:\path"
+  if !DirExist(target) {
+    MsgBox("[flash-key] 目录不存在: " target "`n请检查路径或重新配置。")
     return
   }
-  try Run("wt.exe -d C:\path claude")
+  try {
+    Run("wt.exe -d """ target """ claude")
+  } catch as err {
+    MsgBox("[flash-key] 启动失败: " err.Message "`n`n常见原因：claude 命令未在 PATH 中`n请先确认 'claude --version' 能在终端正常运行。")
+  }
 }
 ```
 
@@ -184,26 +242,34 @@ description: |
 !1::{
   target := "C:\project-alpha"
   if !DirExist(target) {
-    MsgBox("目录不存在: " target)
+    MsgBox("[flash-key] 目录不存在: " target)
     return
   }
   try Run("wt.exe -d """ target """ claude")
+  catch as err {
+    MsgBox("[flash-key] 启动失败: " err.Message "`n请确认 claude 命令可用。")
+  }
 }
 
 !2::{
   target := "D:\work"
   if !DirExist(target) {
-    MsgBox("目录不存在: " target)
+    MsgBox("[flash-key] 目录不存在: " target)
     return
   }
   try Run("wt.exe -d """ target """ claude")
+  catch as err {
+    MsgBox("[flash-key] 启动失败: " err.Message "`n请确认 claude 命令可用。")
+  }
 }
 ```
 
 ### 窗口管理（单击/长按）
 
+根据终端映射表（见下）设置 `_targetExe`。例：Windows Terminal 用 `WindowsTerminal.exe`，WezTerm 用 `wezterm-gui.exe`。
+
 ```autohotkey
-_targetExe      := "WindowsTerminal.exe"
+_targetExe      := "WindowsTerminal.exe"  ; 按终端映射表修改
 _clickThreshold := 300
 _cycleInterval  := 400
 _pressTick      := 0
@@ -285,6 +351,39 @@ _ClickAction() {
 }
 ```
 
+### 截图秒发（Alt+V）
+
+专用快捷键，不与正常粘贴冲突。按 Alt+V 时检测剪贴板有图则存图并打出路径，你手动回车发送。
+
+生成时把脚本路径写死为绝对路径（`A_ScriptDir`），避免用户移动 `.ahk` 文件后找不到脚本。
+
+对应脚本：`save-clipimg.ps1`（生成在同目录）
+
+```autohotkey
+_screenshotsDir := "C:\free\screenshots"
+_scriptDir := A_ScriptDir  ; 生成时替换为实际绝对路径
+
+!v::{
+  if !DllCall("IsClipboardFormatAvailable", "uint", 2)  ; CF_BITMAP
+    return
+
+  if !DirExist(_screenshotsDir)
+    DirCreate(_screenshotsDir)
+  ts := FormatTime(, "yyyy-MM-dd_HHmmss")
+  filePath := _screenshotsDir "\" ts ".png"
+
+  activeHwnd := WinExist("A")
+
+  RunWait('powershell -NoProfile -File "' _scriptDir '\save-clipimg.ps1" "' _screenshotsDir '"', , "Hide")
+
+  if FileExist(filePath) {
+    WinActivate(activeHwnd)
+    Sleep 100
+    Send(filePath)
+  }
+}
+```
+
 ### AHK v2 脚本头部
 
 每个 `.ahk` 文件必须以固定头部开头：
@@ -355,9 +454,39 @@ try {
 
 ## 生成后说明
 
-生成文件后告诉用户：
+生成文件后按以下步骤操作，并逐项验证：
 
-1. **安装 AHK v2**：如果未安装，右键 `install-ahk.ps1` → 使用 PowerShell 运行
-2. **启动快捷键**：双击 `.ahk` 文件（托盘出现图标）
-3. **开机自启**：Win+R → `shell:startup`，把 `.ahk` 放进去
-4. **停止/卸载**：右键托盘图标 → Exit；删除文件即可
+**第一步：安装 AHK v2**
+- 如果未安装 AutoHotkey v2，右键 `install-ahk.ps1` → **使用 PowerShell 运行**
+- ⚠ 如果提示"无法加载文件...因为在此系统上禁止运行脚本"，以管理员身份运行 PowerShell 执行：
+  ```
+  Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+  ```
+  然后再次右键运行 `install-ahk.ps1`
+- 脚本会自动下载安装，看到绿色 `[OK]` 提示即成功
+- 如果下载失败（中国用户），手动下载：`https://mirrors.tuna.tsinghua.edu.cn/archlinux/community/x86_64/autohotkey/`（Arch Linux 镜像，或直接在浏览器打开 autohotkey.com 下载）
+
+**第二步：启动快捷键**
+- 双击生成的 `.ahk` 文件
+- ✅ **验证方法**：系统托盘出现绿色 `H` 图标（AutoHotkey），说明运行成功
+- 如果没看到图标，检查是否已安装 AHK v2（回到第一步）
+
+**第三步：测试每个快捷键**
+- `Alt+S` → 应打开 Claude Code 终端
+- `Alt+C` → 单击收起窗口，长按轮转切换
+- `Ctrl+Alt+C` → 选中文本后发送到 Claude
+- `Alt+V` → 截图后打出图片路径
+- 某个快捷键没反应？检查托盘图标是否在 → 双击 `.ahk` 重新加载
+
+⚠ **快捷键冲突**：如果某个快捷键在你其他软件中已占用（例如 Snipaste 用 Alt+S），右键托盘绿色 `H` 图标 → Suspend Hotkeys 暂停全部快捷键，或者 Edit This Script 自行修改键位。
+
+**临时暂停：** 右键托盘绿色 `H` 图标 → Suspend Hotkeys（暂停全部快捷键）。再次点击恢复。不需要退出。
+
+**第四步（可选）：开机自启**
+- Win+R → 输入 `shell:startup` → 回车
+- 把 `.ahk` 文件复制到打开的文件夹
+- 下次开机自动运行
+
+**停止 / 卸载**
+- 停止：右键托盘绿色 `H` 图标 → Exit
+- 卸载：删除 `.ahk` 文件和配套的 `install-ahk.ps1`、`save-clipimg.ps1`

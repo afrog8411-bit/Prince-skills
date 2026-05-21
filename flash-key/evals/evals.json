@@ -72,6 +72,15 @@
       "files": [
         "scripts/validate-ahk.ps1"
       ]
+    },
+    {
+      "id": 11,
+      "description": "截图秒发功能",
+      "prompt": "我想要截图后直接发送给 Claude，一键搞定",
+      "expected_output": "走向导路径 C，包含截图秒发功能配置，生成含 Alt+V 专用键 + save-clipimg.ps1 的 AHK 脚本",
+      "files": [
+        "scripts/save-clipimg.ps1"
+      ]
     }
   ]
 }
