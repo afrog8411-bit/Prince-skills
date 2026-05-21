@@ -1,0 +1,77 @@
+{
+  "skill_name": "claude-ahk",
+  "evals": [
+    {
+      "id": 1,
+      "description": "默认配置模式",
+      "prompt": "帮我配一套 Claude 快捷键",
+      "expected_output": "走交互式向导，先展示默认配置预览，让用户选择。最终生成 AHK 脚本 + install-ahk.ps1",
+      "files": []
+    },
+    {
+      "id": 2,
+      "description": "直接生成指定快捷键",
+      "prompt": "帮我写个 AHK 脚本，按 Alt+S 在 D:\\projects\\blog 打开 Claude Code",
+      "expected_output": "跳过向导直接生成。先生成 OS 检测，再生成 AHK 脚本 + install-ahk.ps1",
+      "files": []
+    },
+    {
+      "id": 3,
+      "description": "英文触发 - 窗口管理优先",
+      "prompt": "Set up keyboard shortcuts for Claude Code with window management",
+      "expected_output": "走交互式向导（英文触发），处理窗口管理配置，生成完整 AHK 脚本 + install-ahk.ps1",
+      "files": []
+    },
+    {
+      "id": 4,
+      "description": "自定义配置 - 完整流程",
+      "prompt": "我想自定义 Claude 快捷键，项目目录有 C:\\my-project 和 D:\\work，用 Windows Terminal",
+      "expected_output": "走交互式向导路径 B，逐步配置多目录快捷键和终端选择，生成含多个 Alt+1/Alt+2 快捷键的脚本",
+      "files": []
+    },
+    {
+      "id": 5,
+      "description": "仅窗口管理功能",
+      "prompt": "只想要 Claude 窗口管理快捷键，不需要启动和发送文本",
+      "expected_output": "仅生成窗口管理（Alt+C）快捷键和 install-ahk.ps1，不含启动和文本发送功能",
+      "files": []
+    },
+    {
+      "id": 6,
+      "description": "选择默认配置直接生成",
+      "prompt": "就用默认配置吧",
+      "expected_output": "路径 A：跳过所有问题，展示汇总确认后直接生成 Prince 默认方案",
+      "files": []
+    },
+    {
+      "id": 7,
+      "description": "macOS 用户触发",
+      "prompt": "帮我设置 Claude 快捷键，我在 Mac 上",
+      "expected_output": "提示 AutoHotkey 仅支持 Windows，推荐 Hammerspoon 替代方案",
+      "files": []
+    },
+    {
+      "id": 8,
+      "description": "指定非标准终端",
+      "prompt": "我用 WezTerm，帮我配一套快捷键",
+      "expected_output": "走向导过程中选择 WezTerm 终端，生成含 wezterm-gui.exe 启动配置的 AHK 脚本",
+      "files": []
+    },
+    {
+      "id": 9,
+      "description": "修改快捷键",
+      "prompt": "Alt+S 改成 Ctrl+Shift+O 启动 Claude",
+      "expected_output": "直接生成模式，修改默认快捷键为 Ctrl+Shift+O，生成对应 AHK 脚本",
+      "files": []
+    },
+    {
+      "id": 10,
+      "description": "AHK v2 语法验证 - 脚本文件",
+      "prompt": "帮我检查一下生成的 AHK 脚本语法",
+      "expected_output": "使用 scripts/validate-ahk.ps1 对 AHK 文件进行静态语法检查",
+      "files": [
+        "scripts/validate-ahk.ps1"
+      ]
+    }
+  ]
+}
