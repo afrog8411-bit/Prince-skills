@@ -1,109 +1,89 @@
 ---
 name: git-commit
 description: >
-  Git 提交与推送工作流。当用户说"提交"、"上传"、"commit"、"push"、"同步到 GitHub"、
-  "推送到仓库"、"更新仓库"、"提交变更"、"git push"、"同步一下" 或任何涉及
-  把代码变更提交并推送到远程仓库的场景时触发。
-  注意：即使没有明确说"commit"或"push"，只要用户在代码变更后提到"上传"、"更新"、"同步"，
-  也应该触发本 skill。
-  不触发：纯 git 命令询问（如"git rebase 是什么意思"）、不涉及提交/推送的 git 操作。
+  Git 提交与推送工作流。**主动型**——任务做完有变更时，不等用户开口就分析变更、
+  准备提交、写 message。用户说"提交"、"上传"、"commit"、"push"、"同步到 GitHub"、
+  "推一下"、"更新仓库"、"同步一下"时触发。
+  注意：如果 Claude 刚完成一个产生文件变更的任务，应该主动检查要不要提交，
+  而不是等用户下指令。不要 under-trigger。
+  不触发：纯 git 命令解释（如"git rebase 是干嘛的"）、不涉及提交的 git 查询。
 ---
 
-# Git Commit & Push 工作流
+# Git 主动提交 + 智能推送
 
-处理从「代码改好了」到「已推送到远程仓库」的完整流程。
+Skill 不是教你怎么提交——而是让你**少问用户、多干活**。
 
-## 核心约束
+## 核心原则
 
-严格遵守以下红线（来自用户全局 CLAUDE.md）：
+1. **主动**：改完了别等用户说，直接查状态准备提交。
+2. **少问**：commit message 从 diff 里读，不要问"要写什么 message"。
+3. **只问一次**：所有确认浓缩成一句"改好了，可以推吗？"。
+4. **留记录**：推完后更新 CLAUDE.md 或会话记忆，记录本次做了什么。
 
-> **git push 特别约束**：commit 是本地操作，可以做。但推送到任何远程仓库（GitHub、GitLab 等）
-> 之前，必须明确问你"可以推吗？"，等你回复确认。不管这个仓库之前推过多少次、
-> 你之前是否允许过——每一次都要问。没有例外。
+红线（来自全局 CLAUDE.md）：
 
-## 工作流
+> **git push 必须问用户**。commit 可以自己做，push 前必须问"可以推吗？"，等确认再推。
 
-### Step 1: 检查仓库状态
+## 行为
 
-运行 `git status --short` 和 `git diff --stat`，向用户展示当前变更概览：
+### 触发时机
 
+- 用户明确说"提交/commit/push/上传/同步/推一下"
+- **Claude 刚完成一项修改代码/文档/配置的任务，且 git status 有变更**
+- 用户说"改好了"、"差不多了"、"收工"且当前是 git 仓库
+
+### 自动工作流
+
+**① 查变更** —— `git status --short` + `git diff --stat`
+
+**② 读 diff** —— `git diff` 看到底改了啥，理解变更意图，不只看文件名。
+
+**③ 写 message** —— 基于实际 diff 内容生成规范 message：
+
+优先用 feat / fix / refactor / docs / chore：
 ```
-变更文件：
-  modified: src/file1.py (15 insertions, 3 deletions)
-  added:    src/file2.py (新文件)
-  deleted:  old/config.yml
-```
-
-### Step 2: 确认暂存范围
-
-- 如果用户明确说了要提交什么，按用户说的 staging
-- 如果没有指定，展示未暂存文件列表，问"要全部提交还是只提交其中一部分？"
-- 用户确认后 `git add <files>` 或 `git add -A`
-
-### Step 3: 生成提交信息
-
-运行 `git diff --cached` 查看实际变更，生成规范的 commit message：
-
-```
-<type>(<scope>): <简短描述>
-
-<详细说明（如需要）>
+feat(see-free): 1302 限流自动等待 30s 重试
 ```
 
-类型参考：feat / fix / refactor / docs / style / chore / perf / test
+> 不用展示给用户确认。除非用户有特别说明（如"这次叫 xxx"）。
 
-**生成后一定要展示给用户确认**，用户可能想修改。确认后再 commit。
+**④ 提交** —— `git commit`
 
-### Step 4: 提交
-
-```bash
-git commit -m "<title>" -m "<body>"
-```
-
-### Step 5: 展示提交结果
-
-```bash
-git log --oneline -3      # 展示最近 3 条 commit
-git status --short         # 确认工作区干净
-```
-
-### Step 6: 询问推送权限
-
-**这一步不可跳过。** 必须明确说：
+**⑤ 问权限** —— 一句话：
 
 > "已提交。可以推送到 GitHub 吗？"
 
-用 `git remote -v` 确认远程仓库地址，展示给用户。
-等待用户回复确认后再 push。
+**⑥ 推送** —— 用户回复"可以" → `git push`，回复"不" → 终止。
 
-### Step 7: 推送
-
-```bash
-git push origin <branch>
-```
-
-推送成功后，展示结果摘要：
+**⑦ 留痕** —— 推送成功后，更新项目 CLAUDE.md 或会话记录：
 
 ```
-✅ 已推送到 origin/main
-   commit abc1234: feat(auth): implement JWT-based authentication
+## 变更日志
+- 2026-05-23: see-free v5.1 — 1302 处理、--json、batch 串行化
 ```
 
-## 错误处理
+### 异常处理
 
-| 场景 | 处理方式 |
-|------|----------|
-| 没有变更可提交 | 告知用户工作区干净，无需提交 |
-| 没有配置远程仓库 | 提示用户先配置 remote，然后终止 |
-| 分支落后远程 | 提示先 `git pull` 再推送，或者告知可能需 force push（**必须问用户**） |
-| 推送被拒（非快进） | 建议先 pull --rebase，处理冲突后再试 |
-| 用户中途改主意 | 任何一步用户说"算了"都立即终止，不做未授权的操作 |
+| 场景 | 怎么做 |
+|------|--------|
+| 工作区干净 | 告知无需提交，终止 |
+| 没有远程仓库 | 提示配置 remote，终止 |
+| 分支落后 | 提示先 pull，终止。不自动 pull（怕冲突） |
+| 推送被拒 | 提示用户处理，不擅自 rebase/force |
+| 用户中途说"算了" | 立即停，不操作 |
+| 变更太多/太杂 | 问一次"要拆成多个 commit 吗？"，用户说不用就合 |
 
-## 提交信息规范
+## message 生成规范
 
-commit message 应该清晰反映变更内容：
+message 应该反映「**改了啥 + 为什么**」，不是「改了哪些文件」：
 
-- **好的例子**：`feat(api): add rate limiting to chat endpoint` / `fix(see-free): handle 1302 rate limit with 30s cooldown`
-- **差的例子**：`update` / `fix bug` / `changes` / `asdf`
+```
+✓ feat(auth): implement JWT refresh token rotation       # 好的：功能+意图
+✓ fix(see-free): 1302 rate limit with 30s cooldown       # 好的：修复+方案
+✗ update                                               # 差的：没信息
+✗ fix bug                                              # 差的：没说什么 bug
+✗ commit changes                                       # 差的：废话
+✗ 改了 glm.py 和 SKILL.md                               # 差的：文件名不是 message
+```
 
-如果用户的变更涉及多个不相关的改动，建议拆成多个 commit。
+从 diff 的上下文推断 scope（影响范围），从修改意图推断 type（变更类型）。
