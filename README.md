@@ -1,23 +1,22 @@
 # Prince-skills
 
-> Claude Code 技能军火库。让 AI 会看图、会快捷键、会更多。
-
-把 Claude Code 从聊天框里解放出来。每个 skill 解决一个实际问题，装了就回不去。
+> Claude Code 技能集。让你的 AI 会看图、会检索技能、会快捷键。
 
 ## Skills
 
 | Skill | 一句话 |
 |-------|--------|
-| [flash-key](flash-key/) | 一闪启动 Claude，快捷键办事不靠鼠标。窗口管理、选中发送，清爽流畅。 |
-| [see-free](see-free/) | DeepSeek 没有眼睛？智谱免费借一双。看图、画图、做视频，视觉无限制。 |
+| [see-free](see-free/) | Claude 缺视觉能力？看图、分析图表、识别 UI、做视频，GLM-5V-Turbo 或免费智谱模型。 |
+| [skill-downloader](skill-downloader/) | 从 15 个仓库搜索/安装 Claude Code Skill，不用出终端。 |
+| [flash-key](flash-key/) | 一闪启动 Claude，快捷键办事不靠鼠标。窗口管理、选中发送。 |
 
-## 安装方法
+## 安装
 
 ```bash
 /claude install https://github.com/afrog8411-bit/Prince-skills/tree/main/<skill-name>
 ```
 
-或者把 skill 目录下的 `SKILL.md` 复制到 `~/.claude/skills/<skill-name>/`，重启 Claude Code。
+或把 skill 目录下的 `SKILL.md` 复制到 `~/.claude/skills/<skill-name>/`，重启 Claude Code。
 
 ## License
 
