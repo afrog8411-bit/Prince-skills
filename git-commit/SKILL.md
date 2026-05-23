@@ -38,7 +38,17 @@ Skill 不是教你怎么提交——而是让你**少问用户、多干活**。
 
 **② 读 diff** —— `git diff` 看到底改了啥，理解变更意图，不只看文件名。
 
-**③ 写 message** —— 基于实际 diff 内容生成规范 message：
+**③ 同步 README** —— 如果本次变更是 Prince-skills 仓库，自动检查以下内容：
+
+- 根 `README.md` 的 skill 表是否漏了新的 skill 目录（含 SKILL.md 的子目录）
+- 已列出的 skill 描述是否需要更新
+- 如果 `git-commit/` 这类新 skill 没在表里 → **自动加一行**
+- 如果 skill 自己的 `README.md` 不存在 → 自动创建基本介绍
+
+把 README 的改动追加到 stage 里，和代码一起提交。
+> *注意：只加不减。即使某个 skill 暂时没 README，也先建一个占位，不要从根 README 移除。*
+
+**④ 写 message** —— 基于实际 diff 内容生成规范 message：
 
 优先用 feat / fix / refactor / docs / chore：
 ```
@@ -47,15 +57,15 @@ feat(see-free): 1302 限流自动等待 30s 重试
 
 > 不用展示给用户确认。除非用户有特别说明（如"这次叫 xxx"）。
 
-**④ 提交** —— `git commit`
+**⑤ 提交** —— `git commit`
 
-**⑤ 问权限** —— 一句话：
+**⑥ 问权限** —— 一句话：
 
 > "已提交。可以推送到 GitHub 吗？"
 
-**⑥ 推送** —— 用户回复"可以" → `git push`，回复"不" → 终止。
+**⑦ 推送** —— 用户回复"可以" → `git push`，回复"不" → 终止。
 
-**⑦ 留痕** —— 推送成功后，更新项目 CLAUDE.md 或会话记录：
+**⑧ 留痕** —— 推送成功后，更新项目 CLAUDE.md 或会话记录：
 
 ```
 ## 变更日志
