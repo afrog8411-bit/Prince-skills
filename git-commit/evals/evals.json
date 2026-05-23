@@ -1,0 +1,23 @@
+{
+  "skill_name": "git-commit",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "代码改好了，帮我提交推上去。改了 see-free 的 glm.py，修了 1302 限流问题",
+      "expected_output": "展示 git status → 确认暂存 → 生成 feat/fix 类型 commit message → 提交 → 询问推送权限",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "把今天的 README 更新提交一下，就改了一个文件",
+      "expected_output": "展示只有 README.md 变更 → 只 stage 这个文件 → 生成 docs 类型 message → 提交 → 问是否推送",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "git push",
+      "expected_output": "检查是否有未提交变更 → 如有则走完整流程 → 如已提交则直接问推送权限",
+      "files": []
+    }
+  ]
+}
