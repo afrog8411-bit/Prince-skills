@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""智谱AI 免费模型 — 视觉 / 绘图 / 视频 / 对话  v4 — 多 Key 智能调度 + 并行批处理"""
+"""智谱AI 多模态 — 视觉(GLM-5V) / 绘图 / 视频 / 对话  v5.1 — 稳健执行引擎"""
 
 import sys, os, base64, json, argparse, time, mimetypes, re, textwrap, subprocess
 import io, threading
@@ -40,9 +40,25 @@ def load_keys():
                 k, v = line.split("=", 1)
                 k = k.strip()
                 v = v.strip().strip('"').strip("'")
-                if k.startswith("ZHIPU_API_KEY") and v and v not in keys:
+                if k.startswith("ZHIPU_API_KEY") and not k.endswith("_PAID") and v and v not in keys:
                     keys.append(v)
     return keys if keys else [""]
+
+def load_paid_key():
+    """加载付费 API Key（单 key，用于 GLM-5V-Turbo 视觉）。"""
+    key = os.environ.get("ZHIPU_API_KEY_PAID", "")
+    if key:
+        key = key.strip().strip('"').strip("'")
+    if not key:
+        env_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env")
+        if os.path.exists(env_file):
+            with open(env_file, encoding="utf-8") as f:
+                for line in f:
+                    if line.strip().startswith("ZHIPU_API_KEY_PAID="):
+                        key = line.split("=", 1)[1].strip().strip('"').strip("'")
+                        break
+    return key or ""
+
 
 # ----- 智能 Key 调度器 -----
 _SCHED_STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".key_state.json")
@@ -174,6 +190,57 @@ def _req(endpoint, data=None, method="POST"):
             print(f"API 连接失败: {last_err or e}", file=sys.stderr)
             sys.exit(1)
 
+PAID_RETRY_DELAYS = [1, 2, 4, 8, 16]
+
+def _req_paid(endpoint, data=None, method="POST"):
+    """付费 API 请求——单 key 直连，5 次重试 + 1302 限流等待，无调度器开销。"""
+    if data is None:
+        data = {}
+    key = load_paid_key()
+    if not key:
+        print("请先设置 ZHIPU_API_KEY_PAID", file=sys.stderr)
+        sys.exit(1)
+    url = f"{BASE_URL}{endpoint}"
+    body = json.dumps(data).encode("utf-8") if method != "GET" else None
+
+    for attempt in range(len(PAID_RETRY_DELAYS)):
+        headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+        try:
+            with urlopen(Request(url, data=body, headers=headers, method=method), timeout=120) as r:
+                return json.loads(r.read().decode("utf-8"))
+        except HTTPError as e:
+            code = e.code
+            err_body = e.read().decode()
+            try:
+                err_data = json.loads(err_body)
+                err_code = err_data.get("error", {}).get("code", "")
+                if err_code in ("1301", "1310"):
+                    print("API 调用被内容安全审核拦截。请尝试修改提示词。", file=sys.stderr)
+                    sys.exit(1)
+                if err_code == "1302" and attempt < 3:
+                    # 账户级限流，等待 30s 再重试
+                    wait = 30
+                    print(f"  [账户限流 1302] 等待 {wait}s 后重试 ({attempt+1}/3)...", file=sys.stderr)
+                    time.sleep(wait)
+                    continue
+            except json.JSONDecodeError:
+                pass
+            if code in (429, 500, 502, 503) and attempt < len(PAID_RETRY_DELAYS) - 1:
+                wait = PAID_RETRY_DELAYS[attempt]
+                print(f"  [付费API {code}] 重试 {attempt+1}/{len(PAID_RETRY_DELAYS)} ({wait}s)...", file=sys.stderr)
+                time.sleep(wait)
+                continue
+            print(f"付费API 错误 ({code}): {err_body[:200]}", file=sys.stderr)
+            sys.exit(1)
+        except URLError as e:
+            if attempt < len(PAID_RETRY_DELAYS) - 1:
+                wait = PAID_RETRY_DELAYS[attempt]
+                print(f"  [连接失败] 重试 {attempt+1}/{len(PAID_RETRY_DELAYS)} ({wait}s)...", file=sys.stderr)
+                time.sleep(wait)
+                continue
+            print(f"API 连接失败: {str(e)}", file=sys.stderr)
+            sys.exit(1)
+
 def _download_file(url, timeout=60):
     """下载远程文件到临时路径，返回本地路径。"""
     req = Request(url, headers={"User-Agent": "glm-vision"})
@@ -216,10 +283,10 @@ def _encode_image(path):
         mime = "image/png"
     return {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}}
 
-def _call_model(model, content):
+def _call_model(model, content, paid=False):
     """调 chat/completions，返回回复文本。"""
     data = {"model": model, "messages": [{"role": "user", "content": content}]}
-    r = _req("/chat/completions", data)
+    r = _req_paid("/chat/completions", data) if paid else _req("/chat/completions", data)
     return r["choices"][0]["message"]["content"]
 
 def _open_file(path):
@@ -246,14 +313,17 @@ def _detect_intent(question):
     return "simple"
 
 # ----- commands -----
-def do_vision(image_args, question, thinking=False):
+def do_vision(image_args, question, thinking=False, json_output=False):
     if not question:
         question = "请详细描述这张图片的内容，不要遗漏任何文字、数据、元素或细节。"
     paths = _resolve_images(image_args)
     content = [_encode_image(p) for p in paths]
     content.append({"type": "text", "text": question})
-    model = "glm-4.1v-thinking-flash" if thinking else "glm-4v-flash"
-    print(_call_model(model, content))
+    result = _call_model("glm-5v-turbo", content, paid=True)
+    if json_output:
+        print(json.dumps({"success": True, "result": result, "model": "glm-5v-turbo", "images": image_args}, ensure_ascii=False))
+    else:
+        print(result)
 
 def do_chat(image_args):
     """交互式视觉对话模式"""
@@ -290,14 +360,9 @@ def do_chat(image_args):
             content.append({"type": "text", "text": h["a"]})
         content.append({"type": "text", "text": q})
 
-        # 自动选模型
-        intent = _detect_intent(q)
-        model = "glm-4.1v-thinking-flash" if intent == "deep" else "glm-4v-flash"
-
         try:
-            ans = _call_model(model, content)
-            label = "智谱分析" if intent == "deep" else "智谱视觉"
-            print(f"\n[{label}] {ans}\n")
+            ans = _call_model("glm-5v-turbo", content, paid=True)
+            print(f"\n[智谱视觉] {ans}\n")
             history.append({"q": q, "a": ans})
         except SystemExit:
             print("\n[错误] API 调用失败，可重试或输入 exit 退出。")
@@ -465,8 +530,14 @@ def do_video_download(url, output_path):
 def do_keys_status():
     """显示所有 key 的健康状态。"""
     sched = get_scheduler()
-    print(f"共 {len(sched.keys)} 个 API Key，推荐并行数 {sched.best_worker_count()}：")
+    print(f"免费 API Key（{len(sched.keys)} 个），推荐并行数 {sched.best_worker_count()}：")
     print(sched.status())
+    paid = load_paid_key()
+    if paid:
+        masked = paid[:8] + "..." + paid[-4:]
+        print(f"付费 API Key（GLM-5V-Turbo）: {masked} ✅")
+    else:
+        print("付费 API Key（GLM-5V-Turbo）: 未设置 ❌")
 
 def do_queue(prompt_file, workers=None, size="1024x1024", enhance=False):
     """从文件逐行读取提示词，多 Key 并行生成图片。"""
@@ -501,39 +572,51 @@ def do_batch_draw(prompts, size="1024x1024", enhance=False, workers=None):
                 err = (r.stderr or "").strip()[:120]
                 print(f"❌ {p[:40]} → {err}")
 
-def do_batch_vision(images, question=None, thinking=False, workers=None):
-    """并行图片理解——每个子进程独立调度，自动调节并行数。"""
-    script = os.path.abspath(__file__)
-    base = ["python", script, "vision"]
-    if question: base.extend(["-q", question])
-    if thinking: base.append("--thinking")
-    if workers is None:
-        workers = get_scheduler().best_worker_count()
-    workers = min(workers, len(images))
-    if workers < 1:
-        workers = 1
+def do_batch_vision(images, question=None, thinking=False, workers=None, json_output=False):
+    """串行多图理解——付费 key 并发为 1，逐张处理，显示进度。"""
+    if not question:
+        question = "请详细描述这张图片的内容，不要遗漏任何文字、数据、元素或细节。"
+    resolved = _resolve_images(images)
+    total = len(resolved)
+    results = []
+    ok_count = 0
+    fail_count = 0
 
-    with ThreadPoolExecutor(max_workers=workers) as ex:
-        futures = {ex.submit(subprocess.run, base + [img], capture_output=True, timeout=180): img for img in images}
-        for f in as_completed(futures):
-            img = os.path.basename(futures[f])
-            r = f.result()
-            if r.returncode == 0:
-                ans = r.stdout.decode("utf-8", errors="replace").strip()[:150]
-                print(f"[OK] {img}: {ans}")
+    for idx, path in enumerate(resolved, 1):
+        name = os.path.basename(path)
+        print(f"[{idx}/{total}] {name} ...", file=sys.stderr)
+        content = [_encode_image(path)]
+        content.append({"type": "text", "text": question})
+        try:
+            ans = _call_model("glm-5v-turbo", content, paid=True)
+            ok_count += 1
+            if json_output:
+                results.append({"image": name, "success": True, "result": ans})
             else:
-                err = r.stderr.decode("utf-8", errors="replace").strip()[:120]
-                print(f"[FAIL] {img}: {err}")
+                print(f"[OK] {name}: {ans[:200]}")
+        except BaseException as e:
+            fail_count += 1
+            err_msg = str(e).strip()[:200]
+            if json_output:
+                results.append({"image": name, "success": False, "error": err_msg})
+            else:
+                print(f"[FAIL] {name}: {err_msg}")
+
+    if json_output:
+        print(json.dumps({"success": ok_count > 0, "total": total, "ok": ok_count, "fail": fail_count, "results": results}, ensure_ascii=False))
+    else:
+        print(f"\n完成: {ok_count}/{total} 成功, {fail_count}/{total} 失败", file=sys.stderr)
 
 # ----- cli -----
 if __name__ == "__main__":
-    p = argparse.ArgumentParser(description="智谱 AI 免费模型")
+    p = argparse.ArgumentParser(description="智谱 AI 多模态模型")
     sp = p.add_subparsers(dest="cmd")
 
     vp = sp.add_parser("vision", help="图片理解（支持路径或 URL）")
     vp.add_argument("images", nargs="+")
     vp.add_argument("-q", "--question", default=None)
     vp.add_argument("--thinking", action="store_true")
+    vp.add_argument("--json", action="store_true", help="输出 JSON 格式")
 
     cp = sp.add_parser("chat", help="交互式视觉对话（支持路径或 URL）")
     cp.add_argument("images", nargs="+")
@@ -574,11 +657,12 @@ if __name__ == "__main__":
     bvp.add_argument("images", nargs="+")
     bvp.add_argument("-q", "--question", default=None)
     bvp.add_argument("--thinking", action="store_true")
-    bvp.add_argument("--workers", type=int, default=None, help="并行数（默认 auto）")
+    bvp.add_argument("--workers", type=int, default=None, help="保留兼容，付费 key 实际串行")
+    bvp.add_argument("--json", action="store_true", help="输出 JSON 格式")
 
     args = p.parse_args()
     if args.cmd == "vision":
-        do_vision(args.images, args.question, args.thinking)
+        do_vision(args.images, args.question, args.thinking, getattr(args, "json", False))
     elif args.cmd == "chat":
         do_chat(args.images)
     elif args.cmd == "draw":
@@ -598,6 +682,6 @@ if __name__ == "__main__":
     elif args.cmd == "batch-draw":
         do_batch_draw(args.prompts, args.size, args.enhance, args.workers)
     elif args.cmd == "batch-vision":
-        do_batch_vision(args.images, args.question, args.thinking, args.workers)
+        do_batch_vision(args.images, args.question, args.thinking, args.workers, getattr(args, "json", False))
     else:
         p.print_help()

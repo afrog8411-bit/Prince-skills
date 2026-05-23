@@ -1,7 +1,7 @@
 ---
 name: see-free
 description: >
-  智谱AI 免费多模态 — 看图理解、AI 绘图、AI 视频、多 Key 并行批处理。
+  智谱AI 多模态 — 看图理解(GLM-5V付费)、AI 绘图、AI 视频、多 Key 并行批处理。
   以下场景触发：
 
   图片理解：用户发来图片路径/截图/screenshot、问"看看这张图"、"帮我看看"、"图片里有什么"、
@@ -19,85 +19,64 @@ description: >
   不触发：纯文字对话、抽象讨论、不涉及任何视觉内容的请求（如"你觉得呢"）。
 ---
 
-# 智谱AI 视觉 Skill v4 — 多 Key 智能调度 + 并行批处理
+# 智谱AI 视觉 Skill v5.1 — 稳健执行引擎
 
-用智谱 AI 开放平台的免费模型补 deepseek 缺失的视觉能力。
+用智谱 AI 平台补 deepseek 缺失的视觉能力。**视觉识别走付费 GLM-5V-Turbo，绘图/视频走免费模型**。
 
-**免费模型**（永久免费）：
-| 能力 | 模型 | 说明 |
-|------|------|------|
-| 图片理解（通用） | `glm-4v-flash` | 速度快，128K 上下文 |
-| 图片理解（分析） | `glm-4.1v-thinking-flash` | 思维链推理，适合图表/逻辑分析 |
-| AI 绘图 | `cogview-3-flash` | 文生图 |
-| AI 视频 | `cogvideox-flash` | 文生视频，异步提交 |
+## 模型
 
-## 前置条件：首次使用引导
+| 能力 | 模型 | 费用 | 说明 |
+|------|------|------|------|
+| 图片理解 | `glm-5v-turbo` | **付费** | 智谱旗舰多模态，Design2Code 94.8，输入 $1.20/M |
+| AI 绘图 | `cogview-3-flash` | 免费 | 文生图 |
+| AI 视频 | `cogvideox-flash` | 免费 | 文生视频，异步提交 |
 
-用户第一次触发图片理解/AI 绘图/AI 视频时，如果发现 API Key 未配置，按以下流程引导用户完成设置，一步都不能跳：
+## 前置条件：配置 API Key
+
+需要两类 Key：
+
+### 1. 付费 Key（视觉识别用）
+
+从智谱开放平台获取付费 API Key，写入 `.env`：
 
 ```
-发现没有 ZHIPU_API_KEY → 主动询问"要先注册智谱获取免费 API Key，要现在弄吗？"
-→ 用户同意 → 给出以下步骤：
+ZHIPU_API_KEY_PAID=你的付费key
 ```
 
-**步骤 1：注册智谱**
-- 打开 https://bigmodel.cn → 注册，需实名认证
-- 同一个手机号可绑多个账号，多注册几个后面能并行加速
+### 2. 免费 Key（绘图/视频用）
 
-**步骤 2：创建 API Key**
-- 登录 → 控制台 → API Key → 添加，复制 key
-- 多个账号的话，每个都登录创建一次
+注册智谱 → 创建 API Key：
 
-**步骤 3：配置到本地**
-- 写入 `~/.claude/skills/see-free/.env`：
+```
+ZHIPU_API_KEY=免费key
+ZHIPU_API_KEY_2=第二个       # 可选，用于并行加速
+ZHIPU_API_KEY_3=第三个       # 可选
+```
 
-  一个 Key（够用）：
-  ```
-  ZHIPU_API_KEY=你刚才复制的key
-  ```
-  多个账号（可并行加速）：
-  ```
-  ZHIPU_API_KEY=第一个
-  ZHIPU_API_KEY_2=第二个
-  ZHIPU_API_KEY_3=第三个
-  # 不限数量
-  ```
-
-- 也可以设系统环境变量，变量名同上
-- **单 Key 完全能用**，多 Key 只是批量生成时更快
-- 配好后直接再说"帮我看这张图"即可，不用重启
-
-**关于费用**：智谱的 `glm-4v-flash`、`glm-4.1v-thinking-flash` 等模型目前有**免费额度**，日常使用足够，不需要充值。
-
-> 如果用户说"太麻烦了"或"不想注册" → 不要强推，回退为："没关系，那我用文字描述帮你分析，你跟我说说这张图长什么样？"
->
-> 如果用户说"一个就够了" → 不强求多注册，单 Key 完全够用。
+两个池子互不干扰。**付费 Key 没配好时 vision/chat 会报错，draw/video 不受影响。**
 
 ## 脚本命令
 
 ```bash
 # ========== 视觉对话（推荐）==========
-# 进入交互式视觉对话模式
 python ~/.claude/skills/see-free/scripts/glm.py chat <图片路径或URL>
 
 # 例：丢一张图，然后像聊天一样追问
 python ~/.claude/skills/see-free/scripts/glm.py chat 截图.png
 python ~/.claude/skills/see-free/scripts/glm.py chat https://example.com/pic.jpg
 
-# 在对话中，问题含"分析/评价/对比"等词 → 自动用思维链模型
 # 输入 exit 退出
 
-# ========== 单次图片理解 ==========
+# ========== 单次图片理解（GLM-5V-Turbo 付费）==========
 python ~/.claude/skills/see-free/scripts/glm.py vision <路径或URL>
 python ~/.claude/skills/see-free/scripts/glm.py vision <路径或URL> -q 帮我分析一下这个UI设计
-python ~/.claude/skills/see-free/scripts/glm.py vision <路径或URL> -q 分析这张财报图表 --thinking
-python ~/.claude/skills/see-free/scripts/glm.py vision a.png b.png -q 对比这两张截图
+python ~/.claude/skills/see-free/scripts/glm.py vision a.png b.png -q 对比这两张截图 --json
 
-# ========== AI 绘图 ==========
+# ========== AI 绘图（免费）==========
 python ~/.claude/skills/see-free/scripts/glm.py draw "描述文本"
 python ~/.claude/skills/see-free/scripts/glm.py draw "描述" [输出路径] --size 720x1280 --enhance
 
-# ========== AI 视频（一站式：自动提交 → 轮询 → 下载打开）==========
+# ========== AI 视频（免费，一站式：自动提交 → 轮询 → 下载打开）==========
 python ~/.claude/skills/see-free/scripts/glm.py video "描述"
 python ~/.claude/skills/see-free/scripts/glm.py video "描述" --image 参考图.png
 
@@ -106,16 +85,16 @@ python ~/.claude/skills/see-free/scripts/glm.py video-submit "描述"
 python ~/.claude/skills/see-free/scripts/glm.py video-poll <task_id>
 python ~/.claude/skills/see-free/scripts/glm.py video-download <url> [输出路径]
 
-# ========== v4 新命令：并行批量处理 ==========
+# ========== 并行批量处理 ==========
 
-# 查看所有 API Key 的健康状态
+# 查看所有 API Key 的健康状态（含付费 Key）
 python ~/.claude/skills/see-free/scripts/glm.py keys
 
-# 并行生成多张图片（自动分配不同 Key）
-python ~/.claude/skills/see-free/scripts/glm.py batch-draw "prompt1" "prompt2" "prompt3" [--workers 3] [--enhance] [--size 1024x1024]
+# 串行多图理解（GLM-5V-Turbo 付费，逐张处理）
+python ~/.claude/skills/see-free/scripts/glm.py batch-vision img1.png img2.png img3.png -q "描述这张图" --json
 
-# 并行理解多张图片
-python ~/.claude/skills/see-free/scripts/glm.py batch-vision img1.png img2.png img3.png -q "描述这张图" [--workers 3]
+# 并行生成多张图片（免费）
+python ~/.claude/skills/see-free/scripts/glm.py batch-draw "prompt1" "prompt2" "prompt3" [--workers 3] [--enhance] [--size 1024x1024]
 
 # 从文件读取提示词，逐行生成图片
 python ~/.claude/skills/see-free/scripts/glm.py queue prompts.txt [--workers 3] [--enhance]
@@ -125,87 +104,28 @@ python ~/.claude/skills/see-free/scripts/glm.py queue prompts.txt [--workers 3] 
 
 * `--enhance`: 自动追加质量关键词，适合 prompt 较短时
 * `--size`: 1024x1024（方图）| 1280x720（横版）| 720x1280（竖版）
-* `--open`: 生成后弹出文件管理器定位到文件（Windows）
-* `--thinking`: 强制用思维链模型（不设则自动检测）
-* `--workers`: 并行数，默认自动根据健康 Key 数量决定
+* `--thinking`: （兼容旧调用，v5 中统一用 GLM-5V-Turbo，此参数忽略）
+* `--json`: 输出 JSON 格式 `{"success": true, "result": "...", "model": "glm-5v-turbo"}`，适合程序消费
+* `--workers`: （保留兼容，付费 key 实际串行）
 * URL 支持: vision 和 chat 接受 HTTP/HTTPS 图片链接
 * 图片已默认去除 AI 水印
 
-## 多 Key 智能调度（v4）
+## Key 管理
 
-本 skill 支持**多个 API Key 自动调度**，实现跨账号并发突破：
+**免费 Key 池**（`ZHIPU_API_KEY` / `_2` / `_3` …）：
+- 用于 draw/video/batch-draw/queue 命令
+- round-robin 多 Key 调度，遇 429 自动冷却切换
+- 健康状态持久化（`.key_state.json`）
 
-**配置方式**：在 `.env` 或环境变量中设置多个 Key：
-```
-ZHIPU_API_KEY=xxx
-ZHIPU_API_KEY_2=xxx
-ZHIPU_API_KEY_3=xxx
-```
-
-**工作原理**：
-- 所有 Key 自动加载，round-robin 轮流使用
-- 某个 Key 遇到 429 限流时，自动冷却 30s，切换到其他 Key
-- 健康状态跨进程持久化（`.key_state.json`），多个命令之间共享冷却信息
-- `batch-*` 命令自动根据健康 Key 数量调节并行数
-
-**适用场景**：
-- 批量生成图片时，不同 Key 可以同时发请求，突破单账号并发限制
-- 一个 Key 被限流时，自动切换到其他 Key，不影响使用
-- 建议 3-5 个 Key 性价比最高，再多收益递减
-
-## 视觉记忆缓存
-
-本 skill 使用**会话级视觉记忆**来提升多轮对话效率：
-
-1. **首次看图**：调用 `vision` 或 `chat`，完整结果存入视觉记忆
-2. **用户追问**：
-   - 如果记忆中有足够信息回答 → **不调智谱**，直接基于记忆用 deepseek 回答
-   - 如果记忆不足（用户问的视觉细节记忆里没有，如空间关系、特定元素）→ 再次调 vision，用更聚焦的问题
-3. **换图或新话题** → 重新调 vision，更新记忆
-4. **会话结束** → 记忆自动清除
-
-在回答中标注信息来源：
-- 直接来自智谱视觉 → `**[智谱视觉]**`
-- 基于记忆 + deepseek 推理 → `**[分析]**`
-- 最终答案始终展示给用户
-
-## 路由规则
-
-根据用户问题类型和复杂度自动选择最优路径：
-
-**纯描述/识别** — 智谱直出（glm-4v-flash）：
-- "图里有什么"、"这是什么东西"、"帮我看看这张截图"
-- 标注 `**[智谱视觉]**`
-
-**分析/推理/对比** — 思维链模型（glm-4.1v-thinking-flash）：
-- "分析这个图表"、"这个 UI 有什么问题"、"对比这两张截图"
-- chat 模式下自动检测问题意图，含"分析/评价/对比/为什么"等词自动切换
-- 标注 `**[智谱分析]**`
-
-**AI 绘图**：
-- prompt 短时加 `--enhance` 提升质量
-- 竖向图加 `--size 720x1280`，横向图 `--size 1280x720`
-- 多张图请求 → 自动用 `batch-draw` 并行生成
-
-**批量/队列**：
-- "一次生成多张图"、"批量生成" → 用 `batch-draw` 或 `queue`
-- 用户给一个文件说"每行生成一张" → 用 `queue`
-- "一次性理解这些图"、"批量分析" → 用 `batch-vision`
-
-**AI 视频** — 一站式 `video` 命令：
-- 负载高时自动等 10s→30s→60s→120s→120s 重试提交
-- 提交成功后每 15s 轮询，最长等 15 分钟
-- 生成完成自动下载并用默认播放器打开
-- **多 Key 对视频模型无效**（限速在模型层面），耐心等重试即可
+**付费 Key**（`ZHIPU_API_KEY_PAID`）：
+- 用于 vision/chat/batch-vision 命令
+- 单 key 直连，5 次指数退避重试 + 1302 限流等待 30s
+- 并发限制为 1（账户级），batch 自动串行处理
 
 ## 输出格式
 
 ```
-**[智谱视觉]** 这是一张电商后台的订单详情页截图。页面顶部显示订单号...
-
-**[智谱分析]** 这张图表显示了 Q1-Q4 的销售趋势。通过思维链分析：1) 全年增长...
-
-**[分析]** 根据之前看到的截图数据，订单金额为 ¥2,580，共 3 件商品...
+[智谱视觉] 这是一张电商后台的订单详情页截图。页面顶部显示订单号...
 ```
 
 绘图/视频：
@@ -215,17 +135,27 @@ ZHIPU_API_KEY_3=xxx
 尺寸：1024×1024
 ```
 
-批量：
+批量（终端输出）：
 ```
-✅ prompt1 → IMAGE_SAVED:path1.png
-✅ prompt2 → IMAGE_SAVED:path2.png
+[1/3] img1.png ...
+[2/3] img2.png ...
+[3/3] img3.png ...
+[OK] img1.png: 这是一张...（前200字）
+[FAIL] img2.png: 错误信息
+```
+
+批量（`--json`）：
+```json
+{"success": true, "total": 3, "ok": 2, "fail": 1, "results": [...]}
 ```
 
 ## 错误处理
 
-- API Key 未设置 → 走上方「前置条件」全流程引导
+- 付费 Key 未设置 → 提示设置 ZHIPU_API_KEY_PAID
+- 免费 Key 未设置 → 引导注册智谱
 - 图片路径不存在或 URL 无效 → 请用户确认
-- API 429/5xx → 自动切换下一个 Key 重试，全部失败后指数退避
+- API 429/5xx → 自动重试（免费 key 切换 key，付费 key 指数退避）
+- 1302 账户限流 → 等待 30s 后重试，最多 3 次
 - 内容审核拦截 → 提示用户调整提示词
 - 视频失败（VIDEO_FAILED）→ 告知用户重新提交
 

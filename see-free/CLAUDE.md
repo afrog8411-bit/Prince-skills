@@ -1,8 +1,8 @@
-# see-free — 智谱 AI 视觉 Skill
+# glm-vision — 智谱 AI 视觉 Skill v5
 
 ## 项目说明
 
-智谱 AI 免费多模态模型的 Claude Code Skill，提供图片理解、AI 绘图、AI 视频能力。
+智谱 AI 多模态模型的 Claude Code Skill。**视觉识别走付费 GLM-5V-Turbo**，绘图/视频走免费模型。
 
 ## 目录结构
 
@@ -12,16 +12,24 @@ glm-vision/
 ├── scripts/
 │   └── glm.py        # CLI 工具
 ├── docs/
-│   └── v2-design.md  # 设计文档
+│   ├── v2-design.md  # v2 设计文档
+│   └── v5-design.md  # v5 设计文档
 ├── .env              # API Key（已 gitignore）
 └── glm-output/       # 生成的图片/视频输出（已 gitignore）
 ```
 
+## 环境变量
+
+| 变量 | 用途 |
+|------|------|
+| `ZHIPU_API_KEY` / `_2` / `_3` … | 免费模型（draw/video） |
+| `ZHIPU_API_KEY_PAID` | 付费视觉（vision/chat，GLM-5V-Turbo） |
+
 ## 开发约定
 
-- **SKILL.md** 中的路径用 `~/skills/glm-vision/`，这是安装到 `~/.claude/skills/` 后的目标路径
-- 开发时直接在 `C:\free\skills\glm-vision\` 下操作，用绝对路径或相对路径调用
-- 不改 `.env` 的路径引用逻辑（`load_key()` 已自动从脚本上级目录加载）
+- **SKILL.md** 中的路径用 `~/.claude/skills/see-free/`，这是安装到 `~/.claude/skills/` 后的目标路径
+- 改完验证后复制到 `~/.claude/skills/see-free/` 部署
+- 不改 `.env` 的路径引用逻辑（各函数自动从脚本上级目录加载）
 
 ## 开发命令
 
@@ -30,20 +38,8 @@ glm-vision/
 python scripts/glm.py vision <图片路径> -q "问题"
 python scripts/glm.py chat <图片路径>
 python scripts/glm.py draw "描述" --enhance
-
-# v4 多 Key / 批量命令
-python scripts/glm.py keys                   # 查看 Key 健康状态
-python scripts/glm.py batch-draw "p1" "p2"   # 并行生成多张图
-python scripts/glm.py batch-vision a.png b.png -q "描述"  # 并行看图
-python scripts/glm.py queue prompts.txt      # 从文件队列生成
+python scripts/glm.py keys
 ```
-
-## 多 Key 配置（v4）
-
-- 支持多个智谱账号 Key 自动负载均衡
-- `.env` 中配置 `ZHIPU_API_KEY`、`ZHIPU_API_KEY_2`、`ZHIPU_API_KEY_3` ...
-- 遇到 429 自动换 Key，冷却 30s 后恢复
-- 健康状态跨进程持久化（`.key_state.json`，已 gitignore）
 
 ## 生成类任务规则
 
@@ -54,5 +50,6 @@ python scripts/glm.py queue prompts.txt      # 从文件队列生成
 ## 提交前检查
 
 - [ ] `python scripts/glm.py --help` 能正常输出
-- [ ] 两种模型调用至少验证一种可用
+- [ ] `python scripts/glm.py keys` 显示付费 + 免费 Key 状态
+- [ ] vision/chat 两种模型至少验证一种可用
 - [ ] `.env` 不被提交
